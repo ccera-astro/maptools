@@ -99,7 +99,6 @@ def main():
                 f = open (args.decfile, "w")
                 f.write ("%f\n" % desired)
                 f.close()
-                i += 1
             else:
 				print "Movement failed"
         time.sleep(1.0)
