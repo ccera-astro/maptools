@@ -71,11 +71,8 @@ def main():
         # Move to a new DEC every args.hours
         #
         goodmove = False
-        ltp = time.localtime()
-        lsecs = ltp.tm_hour * 3600
-        lsecs += ltp.tm_min * 60
-        lsecs += ltp.tm_sec
-        if ((lsecs % period) in [0,1,2,3] and (time.time() - donetime) > (period/2)):
+        lsecs = time.time()
+        if ((lsecs % period) in [0,1,2,3] and (lsecs - donetime) > (period/3)):
             desired = schedule[i % len(schedule)]
             elevation = desired + rotation
             try:
@@ -103,6 +100,8 @@ def main():
                 f.write ("%f\n" % desired)
                 f.close()
                 i += 1
+            else:
+				print "Movement failed"
         time.sleep(1.0)
 
     return 0
