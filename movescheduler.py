@@ -71,7 +71,7 @@ def main():
         # Move to a new DEC every args.hours
         #
         goodmove = False
-        lsecs = time.time()
+        lsecs = int(time.time())
         if ((lsecs % period) in [0,1,2,3] and (lsecs - donetime) > (period/3)):
             desired = schedule[i % len(schedule)]
             elevation = desired + rotation
