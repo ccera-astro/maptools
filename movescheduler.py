@@ -28,6 +28,17 @@ import math
 import subprocess
 import argparse
 
+def get_decfile(fn):
+    f = open(fn, "r")
+    d = f.readline().strip("\n")
+    f.close()
+    return(float(d))
+
+def put_decfile(fn,dec):
+    f = open(fn, "w")
+    f.write("%f\n" % dec)
+    f.close()
+    
 
 def main():
     
@@ -66,18 +77,22 @@ def main():
     i = args.start
 
     donetime=time.time()
+    firstmove=True
+    old_dec = get_decfile(args.decfile)
     while True:
         #
         # Move to a new DEC every args.hours
         #
         goodmove = False
         lsecs = int(time.time())
-        if ((lsecs % period) in [0,1,2,3] and (lsecs - donetime) > (period/3)):
+        if (firstmove == True or ((lsecs % period) in [0,1,2,3] and (lsecs - donetime) > 30)):
             desired = schedule[i % len(schedule)]
             elevation = desired + rotation
             try:
+                put_decfile(args.decfile, -99.00)
                 print "Moving to %d (%d)" % (elevation, desired)
                 cmdstr = "sshpass -p %s ssh %s@%s %s %d >movement.log 2>&1" % (args.password, args.user, args.host, args.rcmd, elevation)
+                firstmove = False
                 retv = os.system(cmdstr)
                 donetime = time.time()
                 if (retv != 0):
@@ -87,20 +102,18 @@ def main():
                     ls = f.readlines()
                     f.close()
                     for l in ls:
-						if ("Achieved" in l):
-							i += 1
-							goodmove = True
-							break
+                        if ("Achieved" in l):
+                            i += 1
+                            goodmove = True
+                            break
             except:
                 print "Exception was raised"
                 goodmove = False
             if (goodmove == True):
                 print "Movement success"
-                f = open (args.decfile, "w")
-                f.write ("%f\n" % desired)
-                f.close()
+                put_decfile(args.decfile, desired)
             else:
-				print "Movement failed"
+                print "Movement failed"
         time.sleep(1.0)
 
     return 0
