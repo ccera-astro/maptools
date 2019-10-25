@@ -1,0 +1,149 @@
+#!/bin/bash
+cd $HOME/ra_data/BINOCULAR
+
+#
+# Make sure that twe have data to process
+#
+curtfilename=`date -u +%Y%m%d`
+
+if [ ! -e *${curtfilename}-fft-0.csv ]
+then
+	exit
+fi
+
+#
+# Get current UTC
+#
+curt=`date -u +%Y/%m/%d-%H:%M:%S`
+
+
+#
+# Get base Declination from data files
+#
+bdec=`tail -10 *${curtfilename}-fft-0.csv |grep -v ",-999," |tail -1 |awk '
+BEGIN {FS=","}
+/./ {print $9}
+	'`
+
+#
+# Use pyephem to determine current LMST
+#
+sidt=`python << "!EOF!"
+#
+# Determine current sidereal time
+#
+# Use the "ephem" Python library
+#
+import ephem
+def cur_sidereal(longitude,val):
+    #
+    # Convert longitude into format preferred by 'ephem' library
+    #
+    longstr = "%02d" % int(longitude)
+    longstr = longstr + ":"
+    longitude = abs(longitude)
+    frac = longitude - int(longitude)
+    frac *= 60
+    mins = int(frac)
+    longstr += "%02d" % mins
+    longstr += ":00"
+    
+    #
+    # Now get an observer object
+    #
+    x = ephem.Observer()
+    
+    #
+    # Tell it that we're going to base everything on "today"
+    #
+    x.date = ephem.now()
+    x.long = longstr
+    
+    #
+    # Get the julian date, given the above
+    #
+    jdate = ephem.julian_date(x)
+    
+    #
+    # Get sidereal time, turn into a list
+    #
+    tokens=str(x.sidereal_time()).split(":")
+    hours=int(tokens[0])
+    minutes=int(tokens[1])
+    seconds=int(float(tokens[2]))
+    
+    #
+    # Return in csv format
+    #
+    sidt = "%02d,%02d,%02d" % (hours, minutes, seconds)
+    
+    return ((sidt,jdate))
+
+x = cur_sidereal(-76.02,0)
+print x[0].replace(",",":")
+!EOF!`
+
+yesterday=`python yesterday.py 1`
+daybefore=`python yesterday.py 2`
+daybeforethat=`python yesterday.py 3`
+
+gunzip *${yesterday}-fft-0.csv.gz
+
+cat  *${curtfilename}-fft-0.csv |python darkslide.py $bdec $sidt BINOCULAR >f0.dat
+
+gzip *${yesterday}-fft-0.csv
+
+lcnt=`cat f0.dat|wc -l`
+if [ $lcnt -ge 4096 ]
+then
+
+	#
+	# We now have everything we need to construct a plot
+	#
+	gnuplot <<!EOF!
+	set title 'Spectral data Fc=1420.4058MHz, Bw=2.5MHz RA=$sidt DEC=$bdec'
+	set xlabel 'Red Shift, km/sec'
+	set ylabel 'Approx. Sky Temp. (K)'
+	set terminal png large size 1100,600
+	set grid
+	set xtics 20
+	set yrange [10:55]
+	set output 'live_spec.png'
+	plot 'f0.dat' with lines title 'Antenna A'
+!EOF!
+else
+	cp difficulties.png live_spec.png
+fi
+
+ls -l *-tp*.dat |wc -l >pixelcount.txt
+tar cfz pixels.tar.gz *-tp*.dat
+
+#
+# FTP all the interesting data up to website
+#
+pw=`cat ccera-pw`
+ftp -n ccera.ca  >/dev/null 2>&1 <<!EOF!
+user ccera $pw
+cd public_html/files
+cd live_data/BINOCULAR
+binary
+put live_spec.png
+put do_live_data
+put yesterday.py
+put darkslide.py
+put pixelcount.txt
+put pixels.tar.gz
+quit
+!EOF!
+
+if [ FOO = BAR ]
+then
+	case $sidt in
+	    00:25*|00:26*|00:27*|00:28*)
+	         cp t0.dat dark-0.dat
+	         ;;
+		01:25*|01:26*|01:27*|01:28*)
+		     cp t1.dat dark-1.dat
+		    ;;
+	esac
+fi
