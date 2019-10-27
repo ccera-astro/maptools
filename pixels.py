@@ -70,7 +70,7 @@ for t in threeples:
     val = t[2]
     
     pixels[decndx][randx] = (val-minv)
-    pixels[decndx][randx] *= (0.000175/4.0)
+    pixels[decndx][randx] *= (0.000175/1.25)
     pixels[decndx][randx] *= LOWTEMP
     count += 1
 
