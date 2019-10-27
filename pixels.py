@@ -4,7 +4,7 @@ import sys
 larray=[]
 threeples=[]
 PRESTR="BINOCULAR-"
-prelen = len(PRESTR)
+
 count = 0
 import numpy as np
 LOW = -35
@@ -15,7 +15,14 @@ counting = [-1]*((HIGH-LOW)+1)
 tracking = [[]]*len(counting)
 RES=125
 
-for fn in glob.glob(PRESTR+"*-tp.dat"):
+if (len(sys.argv) > 1):
+	prestr = sys.argv[1]
+else:
+	prestr = PRESTR
+
+prelen = len(prestr)
+print "prestr %s" % prestr
+for fn in glob.glob(prestr+"*-tp.dat"):
     ra = fn[prelen:prelen+5]
     ra = float(ra)
     dec = fn[prelen+6:]
@@ -63,7 +70,7 @@ for t in threeples:
     val = t[2]
     
     pixels[decndx][randx] = (val-minv)
-    pixels[decndx][randx] *= 0.000175
+    pixels[decndx][randx] *= (0.000175/4.0)
     pixels[decndx][randx] *= LOWTEMP
     count += 1
 
@@ -80,8 +87,8 @@ for j in range(cols):
 if True:
     import matplotlib.pyplot as plt
     
-    if (len(sys.argv) > 1):
-        RES=int(sys.argv[1])
+    if (len(sys.argv) > 2):
+        RES=int(sys.argv[2])
 
     rpixels = pixels[::-1]
     plt.xticks(list(range(0,cols,8)),list(range(0,24,2)))
