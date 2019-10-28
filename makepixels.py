@@ -43,6 +43,9 @@ linenum=0
 skipcount = 10
 printed = False
 
+#
+# Compute a fixed correction curve, to compensate for "dishing" effect
+#
 correction = []
 slen = NBINS-(IGNORE*2)
 for i in range(slen):
@@ -57,6 +60,7 @@ for i in range(slen):
     cv *= random.uniform(0.98,1.02)
     correction.append(cv)
 
+slopeinit = False
 while True:
     inline=sys.stdin.readline()
     linenum += 1
@@ -102,6 +106,7 @@ while True:
                 values=values[IGNORE:NBINS-IGNORE]
                 values=numpy.divide(values, [10.0]*len(values))
                 values=numpy.power([10.0]*len(values),values)
+                slopeinit = True
                 lv = len(values)
                 sstart = sum(values[0:3])
                 send = sum(values[lv-3:lv])
