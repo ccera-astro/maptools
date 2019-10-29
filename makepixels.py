@@ -5,6 +5,24 @@ import math
 import random
 import ephem
 
+def dumpit(vals, fn, start, incr):
+    axis = start
+    try:
+        fp = open(fn, "w")
+        for x in vals:
+            fp.write("%e %e\n" % (axis, x))
+            axis += incr
+    except:
+        print "Having trouble in dumpit"
+    fp.close()
+
+def interesting(ra, dec):
+    if abs(ra - 19.9) < 0.20 and abs(dec - 40.75) < 5.0:
+        return True
+    else:
+        return False
+        
+
 def isalmost(v,testv,window):
     if (abs(v-testv) <= window):
         return True
@@ -34,6 +52,10 @@ for i in range(rows):
 NBINS=8192
 obscount=0
 BADBIN = 2768
+Fc=1420.40575
+BW=2.5
+START=Fc-(BW/2.0)
+PERBIN=BW/NBINS
 
 IGNORE=int(8192/8)
 
@@ -100,10 +122,14 @@ while True:
             failed = False
             try:
                 values=map(float, inlist[9:])
+                if interesting(ra, dec):
+                    dumpit(values, "raw-spec+CygnusA.dat", START, PERBIN)
             except:
                 failed=True
             if failed == False:
                 values=values[IGNORE:NBINS-IGNORE]
+                if interesting(ra, dec):
+                    dumpit(values, "trimmed+CygnusA.dat", START+(IGNORE*PERBIN), PERBIN)
                 values=numpy.divide(values, [10.0]*len(values))
                 values=numpy.power([10.0]*len(values),values)
                 slopeinit = True
@@ -115,6 +141,8 @@ while True:
                 slope = (send-sstart) / len(values)
                 desloper = [x for x in numpy.arange(0.0,slope*len(values),slope)]
                 values = numpy.subtract(values,desloper)
+                if interesting(ra,dec):
+                    dumpit(values, "desloped+CygnusA.dat", START+(IGNORE*PERBIN), PERBIN)
                 #
                 # Determine min on desloped data
                 #
@@ -128,7 +156,6 @@ while True:
                         values[i] = minv
 
                 if (printed == False):
-                    print "slope is %e" % slope
                     fp = open ("foonly.dat" , "w")
                     for i in range(len(values)):
                         fp.write("%e\n" % values[i])
@@ -141,9 +168,13 @@ while True:
                 values=numpy.divide(values,[minv]*len(values))
                 values=numpy.multiply(values,[TSYS+TMIN]*len(values))
                 values=numpy.subtract(values,[TSYS]*len(values))
+                if interesting(ra,dec):
+                    dumpit(values,"temperature-dished+CygnusA.dat", START+(IGNORE*PERBIN), PERBIN)
+                    
                 values=numpy.subtract(values,correction)
-                if ((linenum % 2000) == 0):
-                    print "temp range: %f %f" % (min(values), max(values))
+                if interesting(ra,dec):
+                    dumpit(values, "corrected_temperature+CygnusA.dat", START+(IGNORE*PERBIN), PERBIN)
+                    
                 if(ra >= 0.0 and ra <= 24.0):
                     try:
                         pixels[decndx][randx] += sum(values)
@@ -151,6 +182,8 @@ while True:
                     except:
                         print "decndx %d randx %d" % (decndx, randx)
                         break
+                else:
+                    print "Ra %f dec %f invalid!" % (a, dec)
 
 for decndx in range(rows):
     for randx in range(cols):
