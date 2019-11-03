@@ -43,6 +43,8 @@ cols = 24 * 4
 
 pixels  = [[0 for i in range(cols)] for j in range(rows)]
 pcounts = [[0 for i in range(cols)] for j in range(rows)]
+subbands = [[[0,0,0,0,0] for i in range(cols)] for j in range(rows)]
+
 
 for i in range(rows):
     for j in range(cols):
@@ -83,6 +85,7 @@ for i in range(slen):
     correction.append(cv)
 
 slopeinit = False
+submap = []
 while True:
     inline=sys.stdin.readline()
     linenum += 1
@@ -128,6 +131,13 @@ while True:
                 failed=True
             if failed == False:
                 values=values[IGNORE:NBINS-IGNORE]
+                if (len(submap) == 0):
+                    bndx = 0
+                    for q in range(5):
+                        submap.append(bndx)
+                        bndx += len(values)/5
+
+                        
                 if interesting(ra, dec):
                     dumpit(values, "trimmed+CygnusA.dat", START+(IGNORE*PERBIN), PERBIN)
                 values=numpy.divide(values, [10.0]*len(values))
@@ -179,6 +189,11 @@ while True:
                     try:
                         pixels[decndx][randx] += sum(values)
                         pcounts[decndx][randx] += 1
+                        bndx = 0
+                        lmap = len(values)/5
+                        for q in range(5):
+                            subbands[decndx][randx][q] = sum(values[bndx:bndx+lmap])
+                            bndx += lmap
                     except:
                         print "decndx %d randx %d" % (decndx, randx)
                         break
@@ -191,6 +206,10 @@ for decndx in range(rows):
             fn = "PROCESSED"+"-%05.2f-%02d-tp.dat" % (float(randx)/4.0, (decndx+LOW))
             fp = open(fn, "w")
             fp.write("%13.2f\n" % (pixels[decndx][randx]/pcounts[decndx][randx]))
+            for q in range(5):
+                v = subbands[decndx][randx][q]/pcounts[decndx][randx]
+                fp.write ("%13.2f " % v)
+            fp.write("\n")
             fp.close()
             
         
