@@ -54,6 +54,7 @@ def main():
     parser.add_argument ("--decfile", dest='decfile', type=str, default="declination.txt", help="declination update file")
     parser.add_argument ("--start", dest="start", type=int, default=0, help="starting motion index")
     parser.add_argument ("--rcmd", dest="rcmd", type=str, default="sudo ./newmoveto.py", help="remote command")
+    parser.add_argument ("--extra", dest="extra", type=float, default="-900", help="Extra declination to visit occasionally")
     
     args=parser.parse_args()
     
@@ -73,6 +74,21 @@ def main():
     #   every args.hours, we move args.degrees degrees
     #
     schedule = range(args.dec_min,args.dec_max,args.degrees)+range(args.dec_max,args.dec_min,-args.degrees)
+    
+    #
+    # We "sprinkle" the extra declination throughout the main schedule
+    #
+    if (extra > -99.0):
+        newschedule = [0.0]*int(float(len(schedule))*1.3333333333333)
+        sn = 0
+        for i in range(len(newschedule)):
+            if ((i % 3) != 0):
+                newschedule[i] = schedule[sn]
+                sn += 1
+            else:
+                newschedule[i] = extra
+    
+        schedule = newschedule
     
     i = args.start
 
