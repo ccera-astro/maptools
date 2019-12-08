@@ -28,6 +28,17 @@ import math
 import subprocess
 import argparse
 
+def get_decfile(fn):
+    f = open(fn, "r")
+    d = f.readline().strip("\n")
+    f.close()
+    return(float(d))
+
+def put_decfile(fn,dec):
+    f = open(fn, "w")
+    f.write("%f\n" % dec)
+    f.close()
+    
 
 def main():
     
@@ -43,6 +54,7 @@ def main():
     parser.add_argument ("--decfile", dest='decfile', type=str, default="declination.txt", help="declination update file")
     parser.add_argument ("--start", dest="start", type=int, default=0, help="starting motion index")
     parser.add_argument ("--rcmd", dest="rcmd", type=str, default="sudo ./newmoveto.py", help="remote command")
+    parser.add_argument ("--extra", dest="extra", type=float, default="-900", help="Extra declination to visit occasionally")
     
     args=parser.parse_args()
     
@@ -63,21 +75,40 @@ def main():
     #
     schedule = range(args.dec_min,args.dec_max,args.degrees)+range(args.dec_max,args.dec_min,-args.degrees)
     
+    #
+    # We "sprinkle" the extra declination throughout the main schedule
+    #
+    if (extra > -99.0):
+        newschedule = [0.0]*int(float(len(schedule))*1.3333333333333)
+        sn = 0
+        for i in range(len(newschedule)):
+            if ((i % 3) != 0):
+                newschedule[i] = schedule[sn]
+                sn += 1
+            else:
+                newschedule[i] = extra
+    
+        schedule = newschedule
+    
     i = args.start
 
     donetime=time.time()
+    firstmove=True
+    old_dec = get_decfile(args.decfile)
     while True:
         #
         # Move to a new DEC every args.hours
         #
         goodmove = False
         lsecs = int(time.time())
-        if ((lsecs % period) in [0,1,2,3] and (lsecs - donetime) > (period/3)):
+        if (firstmove == True or ((lsecs % period) in [0,1,2,3] and (lsecs - donetime) > 30)):
             desired = schedule[i % len(schedule)]
             elevation = desired + rotation
             try:
+                put_decfile(args.decfile, -99.00)
                 print "Moving to %d (%d)" % (elevation, desired)
                 cmdstr = "sshpass -p %s ssh %s@%s %s %d >movement.log 2>&1" % (args.password, args.user, args.host, args.rcmd, elevation)
+                firstmove = False
                 retv = os.system(cmdstr)
                 donetime = time.time()
                 if (retv != 0):
@@ -87,20 +118,18 @@ def main():
                     ls = f.readlines()
                     f.close()
                     for l in ls:
-						if ("Achieved" in l):
-							i += 1
-							goodmove = True
-							break
+                        if ("Achieved" in l):
+                            i += 1
+                            goodmove = True
+                            break
             except:
                 print "Exception was raised"
                 goodmove = False
             if (goodmove == True):
                 print "Movement success"
-                f = open (args.decfile, "w")
-                f.write ("%f\n" % desired)
-                f.close()
+                put_decfile(args.decfile, desired)
             else:
-				print "Movement failed"
+                print "Movement failed"
         time.sleep(1.0)
 
     return 0
