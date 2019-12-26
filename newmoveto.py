@@ -24,6 +24,47 @@ import signal
 
 bbd = None
 
+def readangle(devs,dind):
+        
+    #
+    # Make up a "give me the angle" command
+    #
+    buf[0] = 0x00
+    buf[1] = 0x00
+    buf[2] = 0x05
+    
+    b = bytearray(4)
+    
+    #
+    # Write the command
+    #
+    devs[dind].write(buf)
+    
+    #
+    # Read back the response
+    #
+    x = devs[dind].read(6)
+    
+       #
+    # Load it into a bytearray
+    #
+    for i in range(0,len(b)):
+        b[i] = x[i+2]
+    
+    #
+    # Unpack that bytearray into an integer
+    #
+    angle = struct.unpack(">i", b)
+    
+    #
+    # Convert into floating-point angle estimate
+    #
+    ang = float(angle[0])
+    ang = ang/1000.0
+    ang *= -1.0
+    
+    return(ang)
+
 def sighandle(num, stack):
     global bbd
     
@@ -140,50 +181,14 @@ motor_started = False
 done = False
 movetimer = 120
 timeout = False
+oldport = 0
 while done == False:
     
     #
     # For each device in the list
     #
     for dind in range(0,len(devs)):
-        
-        #
-        # Make up a "give me the angle" command
-        #
-        buf[0] = 0x00
-        buf[1] = 0x00
-        buf[2] = 0x05
-        
-        b = bytearray(4)
-        
-        #
-        # Write the command
-        #
-        devs[dind].write(buf)
-        
-        #
-        # Read back the response
-        #
-        x = devs[dind].read(6)
-        
-        #
-        # Load it into a bytearray
-        #
-        for i in range(0,len(b)):
-            b[i] = x[i+2]
-        
-        #
-        # Unpack that bytearray into an integer
-        #
-        angle = struct.unpack(">i", b)
-        
-        #
-        # Convert into floating-point angle estimate
-        #
-        ang = float(angle[0])
-        ang = ang/1000.0
-        ang *= -1.0
-        
+        ang = readangle(devs, dind)
         #
         # Initialize the single-pole IIR filter with first value
         #
@@ -200,7 +205,6 @@ while done == False:
         
         avgangs[dind] = (ang*alpha) + (avgangs[dind]*beta)
         lastang = avgangs[0]
-        #print "Angle %f" % lastang
 
         if (motor_started == False):
             if (avgangs[dind] < position):
@@ -210,13 +214,18 @@ while done == False:
             motor_started = True
         
         else:
-            if abs(position-avgangs[dind]) <= 0.5:
+            #
+            # There will be some amount of overshoot, so we
+            #  true to compensate for this by stopping early.
+            #
+            if abs(position-avgangs[dind]) <= 1.125:
+                oldport = bbd.port
                 bbd.port = 0
                 print "Achieved position: %f" % position
                 done = True
         
         #
-        # Motion shouldn't take more than 30 seconds (for now!!))
+        # Motion shouldn't take more than movetimer
         #
         if ((time.time() - then) > movetimer):
             bbd.port = 0
@@ -225,6 +234,36 @@ while done == False:
             done = True
 
         time.sleep(0.05)
+
+
+#
+# Let angular momentum damp-out
+#
+time.sleep(2.0)
+
+#
+# Get a fresh reading
+#
+ang = readangle(devs,0)
+time.sleep (0.10)
+ang += readangle(devs,0)
+time.sleep(0.10)
+ang += readangle(devs,0)
+ang /= 3.0
+
+#
+# If we're out by more than 0.5 degree
+# Then run the motor for just a wee bit
+#  in the opposite direction.
+#
+if (abs(ang-position) > 0.5):
+	if (ang-position) < 0:
+		bbd.port = DOWN
+	else:
+		bbd.port = UP
+	time.sleep(0.5)
+	bbd.port = 0
+
 #
 # We really want that motor to stop
 #
