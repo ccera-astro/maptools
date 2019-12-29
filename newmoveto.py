@@ -45,7 +45,7 @@ def readangle(devs,dind):
     #
     x = devs[dind].read(6)
     
-       #
+    #
     # Load it into a bytearray
     #
     for i in range(0,len(b)):
@@ -170,6 +170,21 @@ bbd.port = 0
 DOWN=0b00001101
 UP=0b00001110
 
+
+#
+# Threshold for determining "done" when moving
+#
+# This accounts for inherent angular momentum in the
+#  motion system.  Will need to be adjusted for local
+#  conditions.
+#
+INITIAL_THRESH = 2.5
+
+#
+# Final threshold for possibly doing a "fix up"
+#
+FINAL_THRESH  = 0.5
+
 #
 # Desired position is given on the command line
 #
@@ -218,7 +233,7 @@ while done == False:
             # There will be some amount of overshoot, so we
             #  true to compensate for this by stopping early.
             #
-            if abs(position-avgangs[dind]) <= 1.125:
+            if abs(position-avgangs[dind]) <= INITIAL_THRESH:
                 oldport = bbd.port
                 bbd.port = 0
                 print "Achieved position: %f" % position
@@ -256,7 +271,7 @@ ang /= 3.0
 # Then run the motor for just a wee bit
 #  in the opposite direction.
 #
-if (abs(ang-position) > 0.5):
+if (False and abs(ang-position) >= FINAL_THRESH):
 	if (ang-position) < 0:
 		bbd.port = DOWN
 	else:
