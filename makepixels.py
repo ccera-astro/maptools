@@ -5,60 +5,87 @@ import math
 import random
 import ephem
 
+def dumpit(vals, fn, start, incr):
+    axis = start
+    try:
+        fp = open(fn, "w")
+        for x in vals:
+            fp.write("%e %e\n" % (axis, x))
+            axis += incr
+    except:
+        print "Having trouble in dumpit"
+    fp.close()
+
+def interesting(ra, dec):
+    if abs(ra - 19.9) < 0.20 and abs(dec - 40.75) < 5.0:
+        return True
+    else:
+        return False
+        
+
 def isalmost(v,testv,window):
     if (abs(v-testv) <= window):
         return True
     else:
         return False
 
+LOW = -35
+HIGH = 70
+INCR = 5
+
+TSYS=100.00
+TMIN=20.00
+
+rows = (HIGH-LOW)
+rows += 1
+
+cols = 24 * 4
+
+pixels  = [[0 for i in range(cols)] for j in range(rows)]
+pcounts = [[0 for i in range(cols)] for j in range(rows)]
+subbands = [[[0,0,0,0,0] for i in range(cols)] for j in range(rows)]
+
+
+for i in range(rows):
+    for j in range(cols):
+        pixels[i][j] = -1.0
+        pcounts[i][j] = 0.0
+
 NBINS=8192
-observation=[0.0]*NBINS
 obscount=0
-REDRANGE=170
-SPUR=84
+BADBIN = 2768
+Fc=1420.40575
+BW=2.5
+START=Fc-(BW/2.0)
+PERBIN=BW/NBINS
+
+IGNORE=int(8192/8)
 
 TPCHUNKS=5
-TSYS=100.0
-TMIN=20.0
-
-Fc=1420.40575e6
-C=299792
-bandwidth=2.5e6
-binwidth=bandwidth/NBINS
-
-start_red= -(binwidth/Fc)*C
-start_red *= (NBINS/2)
-red_incr = (binwidth/Fc)*C
-
-desired_dec=float(sys.argv[1])
-ratoks=sys.argv[2].split(":")
-desired_ra=float(ratoks[0])+float(ratoks[1])/60.0
-prefix=sys.argv[3]
-
-#
-# A place to hold an L=PMEDIAN filter
-#
-PMEDIAN=9
-current_filter = [-100.0]*PMEDIAN
-def median(p):
-    global current_filter
-
-    if (current_filter[0] < -50.0):
-        current_filter = [p]*PMEDIAN
-    
-    #
-    # Do the shift
-    #
-    current_filter = [p]+current_filter[0:PMEDIAN-1]
-    
-    #
-    # Median filter
-    #
-    return(numpy.median(current_filter))
-
 
 linenum=0
 skipcount = 10
+printed = False
+
+#
+# Compute a fixed correction curve, to compensate for "dishing" effect
+#
+correction = []
+slen = NBINS-(IGNORE*2)
+for i in range(slen):
+    x = i - slen/2.0
+    x = float(x)
+    cv = (x/float(slen))*(x/float(slen))
+    cv *= 10.0
+    
+    #
+    # Dither it just a wee bit
+    #
+    cv *= random.uniform(0.98,1.02)
+    correction.append(cv)
+
+slopeinit = False
+submap = []
 while True:
     inline=sys.stdin.readline()
     linenum += 1
@@ -67,193 +94,122 @@ while True:
     
     inline=inline.replace("\n", "")
     inlist=inline.split(",")
+    if len(inlist) < NBINS:
+        continue
     
     ra=float(inlist[3])+float(inlist[4])/60.0+float(inlist[5])/3600.0
     dec=float(inlist[8])
     
-    #
-    # Deal with bug in data writer
-    #
-    if (abs(dec-desired_dec) <= 0.5):
+    rac = ra * 60.0
+    rac = rac / 15.0
+    rac = round(rac)
+    rac = rac * 15.0
+    rac = float(rac/60.0)
+    randx = rac*4.0
+    randx = int(randx)
+    if (randx > (24*4)-1):
+        randx = (24*4)-1
+    
+    decndx = int(dec)-LOW
+    if (dec < LOW or dec > HIGH or ra < 0.0 or ra > 24.0):
+        print "%d: Bad ra/dec %f %f" % (linenum, ra, dec)
+    else:
         if (skipcount > 0):
             skipcount -= 1
             continue
+        
+        if ((linenum % 2000) == 0):
+            print "Line %d processed" % linenum
         
         if (len(inlist[9:]) == NBINS):
             failed = False
             try:
                 values=map(float, inlist[9:])
+                if interesting(ra, dec):
+                    dumpit(values, "raw-spec+CygnusA.dat", START, PERBIN)
             except:
                 failed=True
             if failed == False:
+                values=values[IGNORE:NBINS-IGNORE]
+                if (len(submap) == 0):
+                    bndx = 0
+                    for q in range(5):
+                        submap.append(bndx)
+                        bndx += len(values)/5
+
+                        
+                if interesting(ra, dec):
+                    dumpit(values, "trimmed+CygnusA.dat", START+(IGNORE*PERBIN), PERBIN)
                 values=numpy.divide(values, [10.0]*len(values))
                 values=numpy.power([10.0]*len(values),values)
-                if(abs(ra-desired_ra) <= 0.120):
-                    # Update observation
-                    observation=numpy.add(observation, values)
-                    obscount += 1
+                slopeinit = True
+                lv = len(values)
+                sstart = sum(values[0:3])
+                send = sum(values[lv-3:lv])
+                sstart /= 3.0
+                send /= 3.0
+                slope = (send-sstart) / len(values)
+                desloper = [x for x in numpy.arange(0.0,slope*len(values),slope)]
+                values = numpy.subtract(values,desloper)
+                if interesting(ra,dec):
+                    dumpit(values, "desloped+CygnusA.dat", START+(IGNORE*PERBIN), PERBIN)
+                #
+                # Determine min on desloped data
+                #
+                minv = min(values)
+                
+                #
+                # Weed out large spikes
+                #
+                for i in range(len(values)):
+                    if values[i] > (minv*1.75):
+                        values[i] = minv
 
-obscount = float(obscount)
+                if (printed == False):
+                    fp = open ("foonly.dat" , "w")
+                    for i in range(len(values)):
+                        fp.write("%e\n" % values[i])
+                    fp.close()
+                    printed = True
+                
+                #
+                # Now divide by min and convert to temp
+                #
+                values=numpy.divide(values,[minv]*len(values))
+                values=numpy.multiply(values,[TSYS+TMIN]*len(values))
+                values=numpy.subtract(values,[TSYS]*len(values))
+                if interesting(ra,dec):
+                    dumpit(values,"temperature-dished+CygnusA.dat", START+(IGNORE*PERBIN), PERBIN)
+                    
+                values=numpy.subtract(values,correction)
+                if interesting(ra,dec):
+                    dumpit(values, "corrected_temperature+CygnusA.dat", START+(IGNORE*PERBIN), PERBIN)
+                    
+                if(ra >= 0.0 and ra <= 24.0):
+                    try:
+                        pixels[decndx][randx] += sum(values)
+                        pcounts[decndx][randx] += 1
+                        bndx = 0
+                        lmap = len(values)/5
+                        for q in range(5):
+                            subbands[decndx][randx][q] = sum(values[bndx:bndx+lmap])
+                            bndx += lmap
+                    except:
+                        print "decndx %d randx %d" % (decndx, randx)
+                        break
+                else:
+                    print "Ra %f dec %f invalid!" % (a, dec)
 
-if (obscount > 1):
-
-    difference = observation
-    difference = difference.tolist()
-    difference.reverse()
-    
-    #
-    # We just determine the slope between the limits
-    #
-    red = start_red
-    for v in difference:
-        if (isalmost(red,-REDRANGE,red_incr)):
-            slope_begin = v
-        elif (isalmost(red, REDRANGE,red_incr)):
-            slope_end = v
-        red += red_incr
-
-    #
-    # We have the values at the ends, compute slope
-    #
-    slope = slope_end-slope_begin
-    slope /= (float(REDRANGE) * 2.0)
-    slope *= -1.0
-    
-    #
-    # Slope compensation, smoothing
-    #
-    adjust = 0.0
-    red = start_red
-    pv = -100.0
-    desloped = []
-    for v in difference:
-        #
-        # We only care about data in {-REDRANGE,REDRANGE}
-        #
-        if (red >= -REDRANGE and red <= REDRANGE):
+for decndx in range(rows):
+    for randx in range(cols):
+        if (pcounts[decndx][randx] >= 1):
+            fn = "PROCESSED"+"-%05.2f-%02d-tp.dat" % (float(randx)/4.0, (decndx+LOW))
+            fp = open(fn, "w")
+            fp.write("%13.2f\n" % (pixels[decndx][randx]/pcounts[decndx][randx]))
+            for q in range(5):
+                v = subbands[decndx][randx][q]/pcounts[decndx][randx]
+                fp.write ("%13.2f " % v)
+            fp.write("\n")
+            fp.close()
             
-            #
-            # There's a spur in the data right around this redshift--make it go away
-            #
-            if (red >= SPUR-4 and red <= SPUR+4):
-                val = random.uniform(0.99*goodval,1.01*goodval)
-            else:
-                val = v
-                goodval = val
-            
-            if (pv <= -100.0):
-                pv = val
-            
-            #
-            # Smooth
-            #
-            pv = 0.2*val + 0.8*pv
-            
-            #
-            # Deslope
-            #
-            sv = pv + ((red-start_red)*slope)
-            
-            #
-            # Create a buffer of desloped values
-            #
-            desloped.append(sv)
-
-        red += red_incr
-    
-    #
-    # Determine the minimum value over the range of redshift we care about
-    #  (from the desloped values)
-    #
-    obsmin = 1.0e15
-    for v in desloped:
-        if (v < obsmin):
-            obsmin = v
-        
-    #
-    # Compute a wee flattening curve
-    #
-    correction = []
-    slen = len(desloped)
-    for i in range(slen):
-        x = i - slen/2.0
-        x = float(x)
-        cv = (x/float(slen))*(x/float(slen))
-        cv *= 10.0
-        
-        #
-        # Dither it just a wee bit
-        #
-        cv *= random.uniform(0.98,1.02)
-        correction.append(cv)
-
-    #
-    # Now, we output the values, somewhat smoothed
-    #
-    red = -REDRANGE
-    sval = desloped[0]
-    cndx = 0
-    tp = 0.0
-    nval = len(desloped)
-    vincr = nval / TPCHUNKS
-    vincr = int(vincr)
-    tpchunks = [0.0]*(TPCHUNKS+1)
-    chndx = 0
-    for v in desloped:
-        sval = median(v)*0.3 + 0.7*sval
-        dval = (sval/obsmin)
-        dval *= (TMIN+TSYS)
-        dval -= TSYS
-        
-        #
-        # Subtract-out the correction curve
-        #
-        dval -= correction[cndx]
-        
-        print "%f %8.4f" % (red, dval)
-        tp += dval
-        tpchunks[chndx] += dval
-        red += red_incr
-        cndx += 1
-        if ((cndx % vincr) == 0):
-			chndx += 1
-        
-
-	rac = desired_ra * 60.0
-	rac = rac / 15.0
-	rac = round(rac)
-	rac = rac * 15.0
-	rac = float(rac/60.0)
-    fn = prefix+"-%05.2f-%02d-tp.dat" % (rac, desired_dec)
-    v = 0.0
-    vcnt = 0
-    try:
-        f = open(fn, "r")
-        vls = f.readlines()
-        f.close()
-        v = vls[0].strip("\n")
-        v = float(v)
-        vcnt = 1
-    except:
-        pass
-    v += tp
-    vcnt += 1
-    v /= vcnt
-    sun = ephem.Sun()
-    sun.compute()
-    beam = ephem.Equatorial(str(rac), str(desired_dec))
-    sep = math.degrees(ephem.separation((sun.ra,sun.dec),(beam.ra,beam.dec)))
-    #
-    # Avoid applying update when Sun is in the beam
-    #  At our beam-size, it's the only object that will
-    #  really cause any problem.
-    #
-    if (sep > 11.0):
-		f = open(fn, "w")
-		f.write("%9.2f\n" % v)
-		for tpc in tpchunks:
-			f.write("%9.2f " % tpc)
-		f.write("\n")
-		f.close()
-    
         
