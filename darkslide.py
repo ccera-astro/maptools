@@ -38,7 +38,7 @@ prefix=sys.argv[3]
 #
 # A place to hold an L=PMEDIAN filter
 #
-PMEDIAN=9
+PMEDIAN=11
 current_filter = [-100.0]*PMEDIAN
 def median(p):
     global current_filter
@@ -200,7 +200,7 @@ if (obscount > 1):
     tpchunks = [0.0]*(TPCHUNKS+1)
     chndx = 0
     for v in desloped:
-        sval = median(v)*0.3 + 0.7*sval
+        sval = median(v)# *0.3 + 0.7*sval
         dval = (sval/obsmin)
         dval *= (TMIN+TSYS)
         dval -= TSYS
