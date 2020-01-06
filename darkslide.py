@@ -35,26 +35,23 @@ ratoks=sys.argv[2].split(":")
 desired_ra=float(ratoks[0])+float(ratoks[1])/60.0
 prefix=sys.argv[3]
 
-#
-# A place to hold an L=PMEDIAN filter
-#
-PMEDIAN=11
-current_filter = [-100.0]*PMEDIAN
-def median(p):
-    global current_filter
+PMEDIAN=5
 
-    if (current_filter[0] < -50.0):
-        current_filter = [p]*PMEDIAN
+# 
+# Median filter/decimate the input by PMEDIAN
+#
+def median(p,pm):
+    out = []
+    for i in range(0,len(p),pm):
+        cm = p[i:i+pm]
+        mv = numpy.median(cm)
+        for j in range(pm):
+            tweakage = random.uniform(mv*0.999,mv*1.001)
+            out.append(tweakage)
     
-    #
-    # Do the shift
-    #
-    current_filter = [p]+current_filter[0:PMEDIAN-1]
-    
-    #
-    # Median filter
-    #
-    return(numpy.median(current_filter))
+    return (out)
+        
+        
 
 
 linenum=0
@@ -199,8 +196,13 @@ if (obscount > 1):
     vincr = int(vincr)
     tpchunks = [0.0]*(TPCHUNKS+1)
     chndx = 0
-    for v in desloped:
-        sval = median(v)# *0.3 + 0.7*sval
+    if ((len(desloped)) % 2 != 0):
+        desloped.append(desloped[-1])
+        correction.append(correction[-1])
+        
+    medianed = median(desloped,PMEDIAN)
+    for v in medianed:
+        sval = v
         dval = (sval/obsmin)
         dval *= (TMIN+TSYS)
         dval -= TSYS
@@ -208,7 +210,7 @@ if (obscount > 1):
         #
         # Subtract-out the correction curve
         #
-        dval -= correction[cndx]
+        dval -= correction[cndx % len(correction)]
         
         print "%f %8.4f" % (red, dval)
         tp += dval
@@ -216,14 +218,14 @@ if (obscount > 1):
         red += red_incr
         cndx += 1
         if ((cndx % vincr) == 0):
-			chndx += 1
+            chndx += 1
         
 
-	rac = desired_ra * 60.0
-	rac = rac / 15.0
-	rac = round(rac)
-	rac = rac * 15.0
-	rac = float(rac/60.0)
+    rac = desired_ra * 60.0
+    rac = rac / 15.0
+    rac = round(rac)
+    rac = rac * 15.0
+    rac = float(rac/60.0)
     fn = prefix+"-%05.2f-%02d-tp.dat" % (rac, desired_dec)
     v = 0.0
     vcnt = 0
@@ -249,11 +251,11 @@ if (obscount > 1):
     #  really cause any problem.
     #
     if (sep > 11.0):
-		f = open(fn, "w")
-		f.write("%9.2f\n" % v)
-		for tpc in tpchunks:
-			f.write("%9.2f " % tpc)
-		f.write("\n")
-		f.close()
+        f = open(fn, "w")
+        f.write("%9.2f\n" % v)
+        for tpc in tpchunks:
+            f.write("%9.2f " % tpc)
+        f.write("\n")
+        f.close()
     
         

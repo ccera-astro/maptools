@@ -112,6 +112,7 @@ then
 	plot 'f0.dat' with lines title 'Antenna A'
 !EOF!
 else
+    echo Only $lcnt lines in ouput!!
 	cp difficulties.png live_spec.png
 fi
 
