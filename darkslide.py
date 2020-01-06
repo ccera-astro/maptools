@@ -50,7 +50,7 @@ def median(p,pm):
         for j in range(pm):
             tweakage = random.uniform(mv*0.999,mv*1.001)
             out.append(tweakage)
-    out = numpy.convolve(out, numpy.ones(4), 'valid')/4.0
+    out = numpy.convolve(out, numpy.ones(3), 'valid')/3.0
     return (out)
         
         
