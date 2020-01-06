@@ -18,7 +18,7 @@ REDRANGE=170
 SPUR=84
 
 TPCHUNKS=5
-TSYS=85.0
+TSYS=95.0
 TMIN=20.0
 
 Fc=1420.40575e6
@@ -35,7 +35,7 @@ ratoks=sys.argv[2].split(":")
 desired_ra=float(ratoks[0])+float(ratoks[1])/60.0
 prefix=sys.argv[3]
 
-PMEDIAN=5
+PMEDIAN=11
 
 # 
 # Median filter/decimate the input by PMEDIAN
@@ -44,11 +44,13 @@ def median(p,pm):
     out = []
     for i in range(0,len(p),pm):
         cm = p[i:i+pm]
-        mv = numpy.median(cm)
+        mv = min(cm)*3.0
+        mv += numpy.median(cm)
+        mv /= 4.0
         for j in range(pm):
             tweakage = random.uniform(mv*0.999,mv*1.001)
             out.append(tweakage)
-    
+    out = numpy.convolve(out, numpy.ones(4), 'valid')/4.0
     return (out)
         
         
