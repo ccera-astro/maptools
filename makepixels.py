@@ -86,11 +86,20 @@ for i in range(slen):
 
 slopeinit = False
 submap = []
+fndx = 1
+curfile = open(sys.argv[fndx], "r")
+print "Processing file: %s" % sys.argv[fndx]
 while True:
-    inline=sys.stdin.readline()
+    inline=curfile.readline()
     linenum += 1
     if (inline == ""):
-        break
+        curfile.close()
+        fndx += 1
+        if (fndx >= len(sys.argv)):
+            break
+        curfile = open(sys.argv[fndx], "r")
+        print "Processing file: %s" % sys.argv[fndx]
+        linenum = 0
     
     inline=inline.replace("\n", "")
     inlist=inline.split(",")
@@ -112,21 +121,17 @@ while True:
     
     decndx = int(dec)-LOW
     if (dec < LOW or dec > HIGH or ra < 0.0 or ra > 24.0):
-        print "%d: Bad ra/dec %f %f" % (linenum, ra, dec)
+        #print "%s:%d: Bad ra/dec %f %f" % (sys.argv[fndx], linenum, ra, dec)
+        pass
     else:
         if (skipcount > 0):
             skipcount -= 1
             continue
         
-        if ((linenum % 2000) == 0):
-            print "Line %d processed" % linenum
-        
         if (len(inlist[9:]) == NBINS):
             failed = False
             try:
                 values=map(float, inlist[9:])
-                if interesting(ra, dec):
-                    dumpit(values, "raw-spec+CygnusA.dat", START, PERBIN)
             except:
                 failed=True
             if failed == False:
@@ -136,10 +141,6 @@ while True:
                     for q in range(5):
                         submap.append(bndx)
                         bndx += len(values)/5
-
-                        
-                if interesting(ra, dec):
-                    dumpit(values, "trimmed+CygnusA.dat", START+(IGNORE*PERBIN), PERBIN)
                 values=numpy.divide(values, [10.0]*len(values))
                 values=numpy.power([10.0]*len(values),values)
                 slopeinit = True
@@ -149,10 +150,16 @@ while True:
                 sstart /= 3.0
                 send /= 3.0
                 slope = (send-sstart) / len(values)
-                desloper = [x for x in numpy.arange(0.0,slope*len(values),slope)]
+                if (abs(slope) > 0.000001):
+                    try:
+                        desloper = [x for x in numpy.arange(0.0,slope*len(values),slope)]
+                    except:
+                        print "Failure in desloper near line %d in file %s.  Slope %f" % (linenum, sys.argv[fndx], slope)
+                        print "send %f sstart %f len %d" % (send, sstart, len(values))
+                        desloper = [0.0]*len(values)
+                else:
+                    desloper=[0.0]*len(values)
                 values = numpy.subtract(values,desloper)
-                if interesting(ra,dec):
-                    dumpit(values, "desloped+CygnusA.dat", START+(IGNORE*PERBIN), PERBIN)
                 #
                 # Determine min on desloped data
                 #
@@ -178,13 +185,7 @@ while True:
                 values=numpy.divide(values,[minv]*len(values))
                 values=numpy.multiply(values,[TSYS+TMIN]*len(values))
                 values=numpy.subtract(values,[TSYS]*len(values))
-                if interesting(ra,dec):
-                    dumpit(values,"temperature-dished+CygnusA.dat", START+(IGNORE*PERBIN), PERBIN)
-                    
                 values=numpy.subtract(values,correction)
-                if interesting(ra,dec):
-                    dumpit(values, "corrected_temperature+CygnusA.dat", START+(IGNORE*PERBIN), PERBIN)
-                    
                 if(ra >= 0.0 and ra <= 24.0):
                     try:
                         pixels[decndx][randx] += sum(values)
