@@ -69,9 +69,9 @@ for t in threeples:
 
     val = t[2]
     
-    pixels[decndx][randx] = (val-minv)
-    pixels[decndx][randx] *= (0.000175/3.5)
-    pixels[decndx][randx] *= LOWTEMP
+    pixels[decndx][randx] = val
+    #pixels[decndx][randx] *= (0.000175/1.25)
+    #pixels[decndx][randx] *= LOWTEMP
     count += 1
 
 

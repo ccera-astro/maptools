@@ -18,7 +18,7 @@ REDRANGE=170
 SPUR=84
 
 TPCHUNKS=5
-TSYS=95.0
+TSYS=120
 TMIN=20.0
 
 Fc=1420.40575e6
@@ -50,6 +50,7 @@ def median(p,pm):
         for j in range(pm):
             tweakage = random.uniform(mv*0.999,mv*1.001)
             out.append(tweakage)
+
     out = numpy.convolve(out, numpy.ones(3), 'valid')/3.0
     return (out)
         
