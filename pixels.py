@@ -114,24 +114,21 @@ for t in threeples:
     except:
         print "Hmmmm, %d %d" % (gladx, glndx)
     
-    
+
+#
+# Since we have "dummy" rows to make the map a bit more square, we need to
+#   interpolate between the rows
+#
+# This applies only to the equatorial map
+#
 for i in range(rows-1):
-    if ((i % 2) != 0):
-        for j in range(cols):
-            pixels[i][j] = (pixels[i-1][j] + pixels[i+1][j])/2.0
+	if ((i % 2) != 0):
+		for j in range(cols):
+			pixels[i][j] = (pixels[i-1][j] + pixels[i+1][j])/2.0
 
 for j in range(cols):
-    pixels[rows-1][j] = pixels[rows-2][j] + pixels[rows-3][j]
-    pixels[rows-1][j] /= 2.0
-
-for i in range(glats-1):
-    if ((i % 2) != 0):
-        for j in range(glongs):
-            galactic_pixels[i][j] = (galactic_pixels[i-1][j] + galactic_pixels[i+1][j])/2.0
-
-for j in range(glongs):
-    galactic_pixels[glats-1][j] = galactic_pixels[glats-2][j] + galactic_pixels[glats-3][j]
-    galactic_pixels[glats-1][j] /= 2.0
+	pixels[rows-1][j] = pixels[rows-2][j] + pixels[rows-3][j]
+	pixels[rows-1][j] /= 2.0
 
 #
 # Smoothing for galactic map
@@ -152,6 +149,32 @@ for i in range(glongs):
 		v = (a)*cv + (b)*v
 		galactic_pixels[j][i] = v
 
+
+# Smoothing for equatorial map
+#
+a = 0.55
+b = 1.0-a
+
+#
+# First dec-wise
+#
+for i in range(rows-1):
+	v = pixels[i][0]
+	for j in range(cols):
+		cv = pixels[i][j]
+		v = (a)*cv + (b)*v
+		pixels[i][j] = v
+
+#
+# Then ra-wise
+#
+for i in range(cols):
+	v = pixels[0][i]
+	for j in range(rows):
+		cv = pixels[j][i]
+		v = (a)*cv + (b)*v
+		pixels[j][i] = v
+		
 if True:
     import matplotlib.pyplot as plt
     
