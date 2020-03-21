@@ -8,6 +8,26 @@ import time
 import copy
 import argparse
 
+#
+# Correction for antenna noise (spillover + horizon noise)
+#
+# This will be a not-horrific approximation for a small dish
+#
+tantc = [1.5, 1.50135, 1.49508, 1.48117, 1.45962, 1.43059, 1.39604, 1.35921, 1.32337, 
+	1.29175, 1.26578, 1.24359, 1.223, 1.20179, 1.17831, 1.1536, 1.12957,
+	1.10813, 1.09106, 1.07827, 1.06798, 1.05839, 1.04769, 1.03507, 1.02195,
+	1.01004, 1.00105, 0.996393, 0.995445, 0.996785, 0.998988, 1.00066, 1.00124,
+	1.00107, 1.00052, 0.999943, 0.999625, 0.999554, 0.999673, 0.999926, 1.00025,
+	1.00053, 1.00061, 1.00037, 0.999653, 0.998658, 0.997983, 0.998258, 1.00011,
+	1.00388, 1.00888, 1.01416, 1.0188, 1.02195, 1.02363, 1.02436, 1.02471,1.02521,
+	1.02615, 1.02738, 1.02871, 1.02995, 1.03098, 1.03192, 1.03297, 1.03433,
+	1.03616, 1.03822, 1.03988, 1.04054, 1.0396, 1.03687, 1.03306, 1.02895,
+	1.02536, 1.02294, 1.02155, 1.02081, 1.02029, 1.0196, 1.0186, 1.01739,1.01609,
+	1.0148, 1.0136, 1.01247, 1.01136, 1.01023, 1.00905, 1.00783, 1.00658,1.00534,
+	1.00412, 1.00294, 1.00184, 1.00083, 0.999933, 0.999211, 0.998809, 0.998899,
+	0.999649, 1.0012, 1.0034, 1.00593, 1.00849, 1.01077, 1.01256, 1.01387,
+	1.01468, 1.015, 1.015, 1.015]
+
 def dumpit(vals, fn, start, incr):
     axis = start
     try:
@@ -99,6 +119,7 @@ def get_next_fn():
         return fn
 
 def dump_pixels(pixels,subbands,pcounts,rows,cols,args):
+    global tantc
     pixels = numpy.array(pixels)
     minoverall = 1.0e10
     maxoverall = 0.0
@@ -114,6 +135,7 @@ def dump_pixels(pixels,subbands,pcounts,rows,cols,args):
     for decndx in range(rows):
         for randx in range(cols):
             if (pcounts[decndx][randx] >= 1):
+                csys = args.tsys+tantc[decndx]
                 fn = args.prefix+"-%05.2f-%02d-tp.dat" % (float(randx)/4.0, (decndx+LOW))
                 fp = open(fn, "w")
                 temp = pixels[decndx][randx]/float(pcounts[decndx][randx])
@@ -123,8 +145,8 @@ def dump_pixels(pixels,subbands,pcounts,rows,cols,args):
                     temp += args.tmin
                 else:
                     temp /= minoverall
-                    temp *= (args.tmin+args.tsys)
-                    temp -= args.tsys
+                    temp *= (args.tmin+csys)
+                    temp -= csys
                 fp.write("%13.2f\n" % temp)
                 for q in range(5):
                     v = subbands[decndx][randx][q]/float(pcounts[decndx][randx])
@@ -134,8 +156,8 @@ def dump_pixels(pixels,subbands,pcounts,rows,cols,args):
                         v += args.tmin
                     else:
                         v /= minoverall
-                        v *= (args.tmin+args.tsys)
-                        v -= args.tsys
+                        v *= (args.tmin+csys)
+                        v -= csys
                     
                     fp.write ("%6.2f " % v)
                 fp.write("\n")
@@ -148,8 +170,9 @@ def process_files(args):
     global rows
     global cols
     global filelist
-    
-    
+    global tantc
+ 
+        
     linenum=0
     skipcount = 10
     
@@ -240,6 +263,7 @@ def process_files(args):
             print "%s:%d ra %f dec %f" % (nextfn, linenum, ra, dec)
             continue
         else:
+            csys = args.tsys + tantc[decndx]
             if (len(inlist[9:]) == args.nbins):
                 failed = False
                 try:
@@ -445,8 +469,8 @@ def process_files(args):
                         #
                         if (args.continuum == False):
                             values=numpy.divide(values,[minv]*len(values))
-                            values=numpy.multiply(values,[args.tsys+args.tmin]*len(values))
-                            values=numpy.subtract(values,[args.tsys]*len(values))
+                            values=numpy.multiply(values,[csys+args.tmin]*len(values))
+                            values=numpy.subtract(values,[csys]*len(values))
                         
                         #
                         # Figure out which de-dishing correction is best
