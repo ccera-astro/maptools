@@ -84,7 +84,12 @@ for t in threeples:
 
     val = t[2]
     
-    pixels[decndx][randx] = val
+    if (pixels[decndx][randx] == 0.0):
+        pixels[decndx][randx] = val
+    else:
+        pixels[decndx][randx] += val
+        pixels[decndx][randx] /= 2.0
+        
     #pixels[decndx][randx] *= (0.000175/1.25)
     #pixels[decndx][randx] *= LOWTEMP
     count += 1
@@ -110,7 +115,11 @@ for t in threeples:
     #print "%f %f" % (glong, glat)
     
     try:
-        galactic_pixels[gladx][glndx] = val
+        if (galactic_pixels[gladx][glndx] == 0.0):
+            galactic_pixels[gladx][glndx] = val
+        else:
+            galactic_pixels[gladx][glndx] += val
+            galactic_pixels[gladx][glndx] /= 2.0
     except:
         print "Hmmmm, %d %d" % (gladx, glndx)
     
@@ -122,13 +131,13 @@ for t in threeples:
 # This applies only to the equatorial map
 #
 for i in range(rows-1):
-	if ((i % 2) != 0):
-		for j in range(cols):
-			pixels[i][j] = (pixels[i-1][j] + pixels[i+1][j])/2.0
+    if ((i % 2) != 0):
+        for j in range(cols):
+            pixels[i][j] = (pixels[i-1][j] + pixels[i+1][j])/2.0
 
 for j in range(cols):
-	pixels[rows-1][j] = pixels[rows-2][j] + pixels[rows-3][j]
-	pixels[rows-1][j] /= 2.0
+    pixels[rows-1][j] = pixels[rows-2][j] + pixels[rows-3][j]
+    pixels[rows-1][j] /= 2.0
 
 #
 # Smoothing for galactic map
@@ -136,18 +145,18 @@ for j in range(cols):
 a = 0.4
 b = 1.0-a
 for i in range(glats-1):
-	v = galactic_pixels[i][0]
-	for j in range(glongs):
-		cv = galactic_pixels[i][j]
-		v = (a)*cv + (b)*v
-		galactic_pixels[i][j] = v
+    v = galactic_pixels[i][0]
+    for j in range(glongs):
+        cv = galactic_pixels[i][j]
+        v = (a)*cv + (b)*v
+        galactic_pixels[i][j] = v
 
 for i in range(glongs):
-	v = galactic_pixels[0][i]
-	for j in range(glats):
-		cv = galactic_pixels[j][i]
-		v = (a)*cv + (b)*v
-		galactic_pixels[j][i] = v
+    v = galactic_pixels[0][i]
+    for j in range(glats):
+        cv = galactic_pixels[j][i]
+        v = (a)*cv + (b)*v
+        galactic_pixels[j][i] = v
 
 
 # Smoothing for equatorial map
@@ -159,22 +168,22 @@ b = 1.0-a
 # First dec-wise
 #
 for i in range(rows-1):
-	v = pixels[i][0]
-	for j in range(cols):
-		cv = pixels[i][j]
-		v = (a)*cv + (b)*v
-		pixels[i][j] = v
+    v = pixels[i][0]
+    for j in range(cols):
+        cv = pixels[i][j]
+        v = (a)*cv + (b)*v
+        pixels[i][j] = v
 
 #
 # Then ra-wise
 #
 for i in range(cols):
-	v = pixels[0][i]
-	for j in range(rows):
-		cv = pixels[j][i]
-		v = (a)*cv + (b)*v
-		pixels[j][i] = v
-		
+    v = pixels[0][i]
+    for j in range(rows):
+        cv = pixels[j][i]
+        v = (a)*cv + (b)*v
+        pixels[j][i] = v
+        
 if True:
     import matplotlib.pyplot as plt
     
