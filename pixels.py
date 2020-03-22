@@ -57,11 +57,8 @@ rows *= 2
 
 cols = 24 * 4
 
-pixels  = [[0 for i in range(cols)] for j in range(rows)]
+pixels  = [[0.0 for i in range(cols)] for j in range(rows)]
 
-for i in range(rows):
-    for j in range(cols):
-        pixels[i][j] = 1
 
 count = 0
 
@@ -83,37 +80,44 @@ for t in threeples:
     decndx *= 2
 
     val = t[2]
-    
+
     if (pixels[decndx][randx] == 0.0):
         pixels[decndx][randx] = val
     else:
-        pixels[decndx][randx] += val
-        pixels[decndx][randx] /= 2.0
-        
-    #pixels[decndx][randx] *= (0.000175/1.25)
-    #pixels[decndx][randx] *= LOWTEMP
+        cv = pixels[decndx][randx]
+        cr = val/cv
+        #
+        # Sanity check--if two values getting plonked in differ by more than
+        #  +/- 10%, something is wrong
+        #
+        if (0.90 <= cr and cr <= 1.10):
+            pixels[decndx][randx] += val
+            pixels[decndx][randx] /= 2.0
+        else:
+            print "Hmmmm: cv %f val %f" % (cv, val)
+
     count += 1
 
     p = ephem.Equatorial(str(t[0]), str(t[1]))
     galactic = ephem.Galactic(p)
-    
+
     #print "%s %s" % (galactic.lon, galactic.lat)
-    
+
     glong = math.degrees(galactic.lon)
     glong -= 180.0
-    
+
     glat = math.degrees(galactic.lat)
-    
+
     glndx = int(glong)+180
     glndx /= INCR
     glndx -= 1
-    
+
     gladx = int(glat)+90
     gladx /= INCR
     gladx -= 1
-    
+
     #print "%f %f" % (glong, glat)
-    
+
     try:
         if (galactic_pixels[gladx][glndx] == 0.0):
             galactic_pixels[gladx][glndx] = val
@@ -122,7 +126,7 @@ for t in threeples:
             galactic_pixels[gladx][glndx] /= 2.0
     except:
         print "Hmmmm, %d %d" % (gladx, glndx)
-    
+
 
 #
 # Since we have "dummy" rows to make the map a bit more square, we need to
@@ -171,7 +175,7 @@ for i in range(rows-1):
     v = pixels[i][0]
     for j in range(cols):
         cv = pixels[i][j]
-        v = (a)*cv + (b)*v
+        v = (a*cv) + (b*v)
         pixels[i][j] = v
 
 #
@@ -181,12 +185,12 @@ for i in range(cols):
     v = pixels[0][i]
     for j in range(rows):
         cv = pixels[j][i]
-        v = (a)*cv + (b)*v
+        v = (a*cv) + (b*v)
         pixels[j][i] = v
-        
+
 if True:
     import matplotlib.pyplot as plt
-    
+
     if (len(sys.argv) > 2):
         RES=int(sys.argv[2])
 
@@ -200,7 +204,7 @@ if True:
     plt.imshow(rpixels,cmap='jet', interpolation="gaussian")
     plt.colorbar(shrink=0.7,orientation="horizontal").set_label("Est. Brightness (K)")
     plt.savefig('21cm.png', dpi=RES)
-    
+
     plt.figure(2)
     rpixels = galactic_pixels[::-1]
     plt.xticks(list(range(0,360/INCR,8)),list(range(-180,180,40)))
