@@ -20,7 +20,7 @@ def rgb_iir(new,old,a):
     return ret
 
 def rgb_scale(r,scale):
-       visual_correction = [1.1,0.7,1.1]
+       visual_correction = [1.1,0.8,1.1]
        ret = []
        for i in range(len(r)):
            v = r[i]/scale[i]
@@ -28,6 +28,44 @@ def rgb_scale(r,scale):
            ret.append(v)
        return ret
 
+def rgb_make(rv):
+    expand = 3
+    inter_len = len(rv)*3
+    inter_len *= expand
+    inter_buf = []
+    out_buf = []
+    #
+    # Expand
+    #
+    for i in range(len(rv)):
+        for j in range(3*expand):
+            inter_buf.append(rv[i])
+    if (len(inter_buf) != inter_len):
+        raise ValueError("Problem with length of inter_buf")
+    
+    #
+    # Smooth inter_buf
+    #
+    v = inter_buf[0]
+    a = 0.5
+    b = 1.0 - a
+    for i in range(len(inter_buf)):
+        v = inter_buf[i]*a + v*b
+        inter_buf[i] = v
+    
+    #
+    # Now decimate it back down
+    #
+    prcnt = len(inter_buf)/7
+    prcnt = int(prcnt)
+    inter_buf=inter_buf[prcnt:-prcnt]
+    for i in range(3):
+        lv = len(inter_buf)/3
+        v = sum(inter_buf[(i*lv):(i+1)*lv])
+        v /= lv
+        out_buf.append(v)
+    return (out_buf)   
+    
 parser = argparse.ArgumentParser()
 
 parser.add_argument("--prefix", default="PROCESSED-", help="output filename prefix")
@@ -133,14 +171,7 @@ for fn in glob.glob(args.prefix+"*-tp.dat"):
         # Form RGB values from input sub-bands, based on rgb_map
         #
         if (len(rgb_toks) == 5):
-            rgb = []
-            for z in rgb_map:
-                x = rgb_vals[z[0]]
-                x += rgb_vals[z[1]]
-                x /= 2.0
-                if (x > tmax):
-                    tmax = x
-                rgb.append(x)
+            rgb = rgb_make(rgb_vals)
             if (rgb[0] > rmax):
                 rmax = rgb[0]
             if (rgb[1] > gmax):
@@ -362,13 +393,14 @@ if True:
     plt.ylabel("DEC")
     plt.title("H1 Red/Blueshift")
     plt.imshow(rpixels,cmap='jet', interpolation="gaussian")
-    cbar = plt.colorbar(shrink=0.7,orientation="horizontal")
-    cbar.set_label("Redshift km/sec")
-    numticks = np.arange(0.0,1.0,0.1)
-    tl = 280/(len(numticks)-2)
-    tks = range(-140,140+1,tl)
-    cbar.set_ticks(np.arange(0.0,1.0,0.1))
-    cbar.ax.set_xticklabels(tks)
+    if False:
+        cbar = plt.colorbar(shrink=0.7,orientation="horizontal")
+        cbar.set_label("Redshift km/sec")
+        numticks = np.arange(0.0,1.0,0.1)
+        tl = 280/(len(numticks)-2)
+        tks = range(-140,140+1,tl)
+        cbar.set_ticks(np.arange(0.0,1.0,0.1))
+        cbar.ax.set_xticklabels(tks)
     plt.savefig(args.oprefix+"-rgb.png", dpi=args.resolution)
 
     print "rmax %f gmax %f bmax %f" % (rmax, gmax, bmax)
