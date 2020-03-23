@@ -214,6 +214,8 @@ glongs = 360/args.increment
 glats = 180/args.increment
 
 galactic_pixels = [[0.0 for i in range(glongs)] for j in range(glats)]
+galactic_rgb_pixels = [[[0.0,0.0,0.0] for i in range(glongs)] for j in range(glats)]
+
 
 for t in fourples:
     randx = t[0]
@@ -266,6 +268,8 @@ for t in fourples:
 
     #print "%f %f" % (glong, glat)
 
+    galactic_rgb_pixels[gladx][glndx] = rgb_scale(t[3],[rmax,gmax,bmax])
+    
     try:
         if (galactic_pixels[gladx][glndx] == 0.0):
             galactic_pixels[gladx][glndx] = val
@@ -300,17 +304,24 @@ a = 0.4
 b = 1.0-a
 for i in range(glats-1):
     v = galactic_pixels[i][0]
+    ov = galactic_rgb_pixels[i][0]
     for j in range(glongs):
         cv = galactic_pixels[i][j]
         v = (a)*cv + (b)*v
         galactic_pixels[i][j] = v
 
+        ov = rgb_iir(galactic_rgb_pixels[i][j], ov, a)
+        galactic_rgb_pixels[i][j] = ov
+
 for i in range(glongs):
     v = galactic_pixels[0][i]
+    ov = galactic_rgb_pixels[0][i]
     for j in range(glats):
         cv = galactic_pixels[j][i]
         v = (a)*cv + (b)*v
         galactic_pixels[j][i] = v
+        ov = rgb_iir(galactic_rgb_pixels[j][i], ov, a)
+        galactic_rgb_pixels[j][i] = ov
 
 #
 # Smoothing for RGB map
@@ -402,7 +413,20 @@ if True:
         cbar.set_ticks(np.arange(0.0,1.0,0.1))
         cbar.ax.set_xticklabels(tks)
     plt.savefig(args.oprefix+"-rgb.png", dpi=args.resolution)
+    
 
+    plt.figure(4)
+    rpixels = galactic_rgb_pixels[::-1]
+    xtlist = list(range(0,180,40))
+    xtlist = list(range(180,360,40))+xtlist
+    plt.xticks(list(range(0,360/args.increment,8)),xtlist)
+    plt.yticks(list(range(0,180/args.increment,4)),list(np.arange(90,-90,-20)))
+    plt.xlabel("Galactic Longitude")
+    plt.ylabel("Galactic Latitude")
+    plt.title("H1 Red/Blueshit")
+    plt.imshow(rpixels,cmap='jet', interpolation="gaussian")
+    #plt.colorbar(shrink=0.7,orientation="horizontal").set_label("Est. Brightness (K)")
+    plt.savefig(args.oprefix+"-galactic-rgb.png", dpi=args.resolution)
     print "rmax %f gmax %f bmax %f" % (rmax, gmax, bmax)
     print "rcount %d gcount %d bcount %d" % (rcount, gcount, bcount)
 
