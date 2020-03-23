@@ -603,7 +603,7 @@ def process_files(args):
                                         pv = to_temp(srange,args.method)
                                     else:
                                         pv = sum(values)
-                                        subbands[decndx][randx][q] = pv
+                                    subbands[decndx][randx][q] += pv
 
                                     bndx += lmap
                         except:
