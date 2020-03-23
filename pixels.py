@@ -64,8 +64,24 @@ def rgb_make(rv):
         v = sum(inter_buf[(i*lv):(i+1)*lv])
         v /= lv
         out_buf.append(v)
-    return (out_buf)   
-    
+    return (out_buf)
+     
+def gal_index(ra,dec):
+    p = ephem.Equatorial(str(ra), str(dec))
+    galactic = ephem.Galactic(p)
+    glong = math.degrees(galactic.lon)
+    glat = math.degrees(galactic.lat)
+
+    glndx = int(glong)+180
+    glndx %= 360
+    glndx /= args.increment
+    glndx -= 1
+
+    gladx = int(glat)+90
+    gladx /= args.increment
+    gladx -= 1
+    return ((glndx,gladx))
+
 parser = argparse.ArgumentParser()
 
 parser.add_argument("--prefix", default="PROCESSED-", help="output filename prefix")
@@ -248,26 +264,7 @@ for t in fourples:
         else:
             print "Hmmmm: cv %f val %f" % (cv, val)
 
-    p = ephem.Equatorial(str(t[0]), str(t[1]))
-    galactic = ephem.Galactic(p)
-
-    #print "%s %s" % (galactic.lon, galactic.lat)
-
-    glong = math.degrees(galactic.lon)
-
-    glat = math.degrees(galactic.lat)
-
-    glndx = int(glong)+180
-    glndx %= 360
-    glndx /= args.increment
-    glndx -= 1
-
-    gladx = int(glat)+90
-    gladx /= args.increment
-    gladx -= 1
-
-    #print "%f %f" % (glong, glat)
-
+    glndx,gladx = gal_index(t[0],t[1])
     galactic_rgb_pixels[gladx][glndx] = rgb_scale(t[3],[rmax,gmax,bmax])
     
     try:
@@ -298,11 +295,36 @@ for j in range(cols):
     rgb_pixels[rows-1][j] = avg_rgb(rgb_pixels[rows-2][j],rgb_pixels[rows-3][j])
 
 #
+# Before we smooth the galactic maps, find dead zones, and make a note...
+#
+# We cover from -90 to args.declow and args.dechigh to +90
+#
+# This assumes complete coverage of the resulting "live" zone
+#
+deadzones = []
+for ra in np.arange(0,24,0.1):
+    
+    #
+    # Lower range
+    #
+    for dec in range(-90,args.declow):
+        ndx = gal_index(ra,dec)
+        if (ndx not in deadzones):
+            deadzones.append(gal_index(ra,dec))
+    #
+    # Upper range
+    #
+    for dec in range(args.dechigh+1,90):
+        ndx = gal_index(ra,dec)
+        if (ndx not in deadzones):
+            deadzones.append(gal_index(ra,dec))
+        
+#
 # Smoothing for galactic map
 #
 a = 0.4
 b = 1.0-a
-for i in range(glats-1):
+for i in range(glats):
     v = galactic_pixels[i][0]
     ov = galactic_rgb_pixels[i][0]
     for j in range(glongs):
@@ -323,6 +345,22 @@ for i in range(glongs):
         ov = rgb_iir(galactic_rgb_pixels[j][i], ov, a)
         galactic_rgb_pixels[j][i] = ov
 
+
+if True:
+    import random
+    for c in deadzones:
+		
+		#
+		# For total-power, just set it to a very-low temperature
+		#
+        galactic_pixels[c[1]][c[0]] = 3.0
+
+        #
+        # For RGB, make it dark gray
+        #
+        gray = 30.0/255.0
+        galactic_rgb_pixels[c[1]][c[0]] = [gray,gray,gray]
+    
 #
 # Smoothing for RGB map
 #
@@ -423,7 +461,7 @@ if True:
     plt.yticks(list(range(0,180/args.increment,4)),list(np.arange(90,-90,-20)))
     plt.xlabel("Galactic Longitude")
     plt.ylabel("Galactic Latitude")
-    plt.title("H1 Red/Blueshit")
+    plt.title("H1 Red/Blueshift")
     plt.imshow(rpixels,cmap='jet', interpolation="gaussian")
     #plt.colorbar(shrink=0.7,orientation="horizontal").set_label("Est. Brightness (K)")
     plt.savefig(args.oprefix+"-galactic-rgb.png", dpi=args.resolution)
