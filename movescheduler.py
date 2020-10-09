@@ -90,7 +90,22 @@ def main():
     
         schedule = newschedule
     
-    i = args.start
+    #
+    # Restart from where we last pointed +/- one increment
+    #
+    if(args.start  < 0):
+        fp = open(args.decfile, "r")
+        starting_dec = float(fp.readline())
+        fp.close()
+        
+        starting_dec -= args.degrees
+        if (starting_dec < args.min):
+            starting_dec += args.degrees*2.0
+        for i in len(schedule):
+            if(abs(start_dec-schedule[i]) < args.degrees/3.0):
+                break
+    else:
+        i = args.start
 
     donetime=time.time()
     firstmove=True
